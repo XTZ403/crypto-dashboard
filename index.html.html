@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Крипто-дашборд · ТОП-5</title>
+  <style>
+    /* ========== БАЗОВЫЕ СТИЛИ И ПЕРЕМЕННЫЕ ========== */
+    :root {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --surface-hover: #273449;
+      --text: #e2e8f0;
+      --text-muted: #94a3b8;
+      --green: #4ade80;
+      --red: #f87171;
+      --accent: #38bdf8;
+      --radius: 16px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 16px;
+    }
+
+    /* ========== ШАПКА ========== */
+    header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    h1 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .subtitle {
+      color: var(--text-muted);
+      margin-top: 8px;
+      font-size: 0.95rem;
+    }
+
+    /* ========== КНОПКА ОБНОВЛЕНИЯ ========== */
+    .refresh-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 20px;
+      padding: 12px 24px;
+      border: none;
+      border-radius: 999px;
+      background: var(--accent);
+      color: #0f172a;
+      font-weight: 600;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+    }
+
+    .refresh-btn:hover:not(:disabled) {
+      background: #7dd3fc;
+    }
+
+    .refresh-btn:active:not(:disabled) {
+      transform: scale(0.97);
+    }
+
+    .refresh-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    /* Спиннер внутри кнопки во время загрузки */
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(15, 23, 42, 0.3);
+      border-top-color: #0f172a;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* ========== СЕТКА КАРТОЧЕК ========== */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      width: 100%;
+      max-width: 1100px;
+    }
+
+    /* ========== КАРТОЧКА МОНЕТЫ ========== */
+    .card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 20px;
+      transition: background 0.2s, transform 0.2s;
+    }
+
+    .card:hover {
+      background: var(--surface-hover);
+      transform: translateY(-2px);
+    }
+
+    .card-top {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .coin-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #0f172a;
+    }
+
+    .coin-name {
+      font-weight: 600;
+      font-size: 1rem;
+    }
+
+    .coin-symbol {
+      text-transform: uppercase;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+    }
+
+    .coin-price {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .coin-change {
+      font-size: 0.9rem;
+      font-weight: 500;
+    }
+
+    .coin-change.positive { color: var(--green); }
+    .coin-change.negative { color: var(--red); }
+
+    .coin-meta {
+      margin-top: 12px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    /* ========== СООБЩЕНИЕ ОБ ОШИБКЕ ========== */
+    .error {
+      max-width: 600px;
+      margin: 24px auto 0;
+      padding: 14px 20px;
+      border-radius: 12px;
+      background: rgba(248, 113, 113, 0.12);
+      border: 1px solid rgba(248, 113, 113, 0.3);
+      color: var(--red);
+      font-size: 0.9rem;
+      text-align: center;
+    }
+
+    .hidden { display: none; }
+
+    /* ========== СКЕЛЕТОН ЗАГРУЗКИ (ПЕРВЫЙ ЗАПРОС) ========== */
+    .skeleton {
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 20px;
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .skeleton-line {
+      height: 14px;
+      border-radius: 6px;
+      background: #334155;
+      margin-bottom: 10px;
+    }
+
+    .skeleton-line.wide { width: 70%; }
+    .skeleton-line.medium { width: 50%; }
+    .skeleton-line.narrow { width: 30%; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>₿ Крипто-дашборд</h1>
+    <p class="subtitle">ТОП-5 криптовалют по рыночной капитализации · данные CoinGecko</p>
+    <button id="refreshBtn" class="refresh-btn" type="button">
+      <span id="btnIcon">↻</span>
+      <span id="btnText">Обновить вручную</span>
+    </button>
+  </header>
+
+  <main id="grid" class="grid" aria-live="polite"></main>
+  <div id="errorBox" class="error hidden" role="alert"></div>
+
+  <script>
+    /* ============================================================
+       КОНСТАНТЫ
+       ============================================================ */
+
+    /**
+     * URL публичного API CoinGecko.
+     * Эндпоинт /coins/markets возвращает рыночные данные монет.
+     * Параметры:
+     *  - vs_currency=usd   — цены в долларах США
+     *  - order=market_cap_desc — сортировка по капитализации (от большей к меньшей)
+     *  - per_page=5        — только ТОП-5 монет
+     *  - page=1            — первая страница
+     *  - sparkline=false   — не запрашивать мини-график (меньше данных)
+     *  - price_change_percentage=24h — запросить изменение цены за 24 часа
+     *
+     * API не требует ключа, лимит ~10–30 запросов в минуту.
+     */
+    const API_URL =
+      'https://api.coingecko.com/api/v3/coins/markets' +
+      '?vs_currency=usd&order=market_cap_desc&per_page=5&page=1' +
+      '&sparkline=false&price_change_percentage=24h';
+
+    /* ============================================================
+       DOM-ЭЛЕМЕНТЫ
+       ============================================================ */
+
+    const grid = document.getElementById('grid');
+    const refreshBtn = document.getElementById('refreshBtn');
+    const btnText = document.getElementById('btnText');
+    const btnIcon = document.getElementById('btnIcon');
+    const errorBox = document.getElementById('errorBox');
+
+    /* ============================================================
+       ФУНКЦИИ ФОРМАТИРОВАНИЯ
+       ============================================================ */
+
+    /**
+     * Форматирует число как денежную сумму в USD.
+     * Для больших значений (миллионы/миллиарды) использует компактную нотацию,
+     * чтобы цена не растягивала карточку.
+     *
+     * @param {number} value — числовое значение (например, 67000.5)
+     * @returns {string} — отформатированная строка (например, "$67,000.50")
+     */
+    function formatCurrency(value) {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: value < 1 ? 6 : 2,
+      }).format(value);
+    }
+
+    /**
+     * Форматирует процентное изменение с явным знаком.
+     * Положительное значение получает "+", отрицательное уже имеет "-".
+     *
+     * @param {number|null} value — процент изменения (например, 2.34 или -1.2)
+     * @returns {string} — строка вида "+2.34%" или "-1.20%"
+     */
+    function formatPercent(value) {
+      if (value === null || value === undefined) return '—';
+      const sign = value > 0 ? '+' : '';
+      return `${sign}${value.toFixed(2)}%`;
+    }
+
+    /* ============================================================
+       ЗВУК
+       ============================================================ */
+
+    /**
+     * Воспроизводит короткий звуковой сигнал при клике на кнопку.
+     * Использует Web Audio API — не требует загрузки аудиофайлов.
+     * Осциллятор создаёт тон частотой 880 Гц (нота A5) длительностью 0.08 с
+     * с плавным затуханием, чтобы звук не был резким.
+     */
+    function playClickSound() {
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return; // В очень старых браузерах просто пропускаем
+
+        const ctx = new AudioContext();
+        const oscillator = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(880, ctx.currentTime);
+
+        // Плавное затухание громкости до почти нуля за 0.08 секунды
+        gainNode.gain.setValueAtTime(0.15, ctx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+
+        oscillator.connect(gainNode);
+        gainNode.connect(ctx.destination);
+
+        oscillator.start();
+        oscillator.stop(ctx.currentTime + 0.08);
+      } catch {
+        // Если Web Audio недоступен — молча игнорируем, звук не критичен
+      }
+    }
+
+    /* ============================================================
+       СОСТОЯНИЕ ЗАГРУЗКИ
+       ============================================================ */
+
+    /**
+     * Переключает визуальное состояние загрузки.
+     * Когда loading === true:
+     *   - кнопка блокируется,
+     *   - вместо иконки ↻ появляется CSS-спиннер,
+     *   - текст меняется на «Загрузка...».
+     *
+     * @param {boolean} loading — true, если идёт запрос
+     */
+    function setLoading(loading) {
+      refreshBtn.disabled = loading;
+      btnText.textContent = loading ? 'Загрузка...' : 'Обновить вручную';
+
+      if (loading) {
+        btnIcon.innerHTML = '<span class="spinner"></span>';
+      } else {
+        btnIcon.textContent = '↻';
+      }
+    }
+
+    /* ============================================================
+       ОШИБКИ
+       ============================================================ */
+
+    /**
+     * Показывает сообщение об ошибке под карточками.
+     * Если message === null — скрывает блок ошибки.
+     *
+     * @param {string|null} message — текст ошибки для пользователя
+     */
+    function showError(message) {
+      if (!message) {
+        errorBox.classList.add('hidden');
+        errorBox.textContent = '';
+        return;
+      }
+      errorBox.textContent = message;
+      errorBox.classList.remove('hidden');
+    }
+
+    /* ============================================================
+       РЕНДЕР СКЕЛЕТОНА (пока идёт первый запрос)
+       ============================================================ */
+
+    /**
+     * Показывает 5 карточек-заглушек, пока данные не загрузились.
+     * Это улучшает восприятие: пользователь сразу видит структуру,
+     * а не пустой экран.
+     */
+    function renderSkeleton() {
+      const cards = Array.from({ length: 5 }, () => `
+        <div class="skeleton">
+          <div class="skeleton-line wide"></div>
+          <div class="skeleton-line medium"></div>
+          <div class="skeleton-line narrow"></div>
+          <div class="skeleton-line wide"></div>
+        </div>
+      `).join('');
+
+      grid.innerHTML = cards;
+    }
+
+    /* ============================================================
+       СОЗДАНИЕ ОДНОЙ КАРТОЧКИ
+       ============================================================ */
+
+    /**
+     * Принимает объект монеты из ответа CoinGecko и возвращает HTML-строку карточки.
+     *
+     * Используемые поля ответа API:
+     *   - name / symbol / image — название, тикер и иконка
+     *   - current_price — текущая цена в USD
+     *   - price_change_percentage_24h — изменение за 24 часа (может быть null)
+     *   - market_cap — рыночная капитализация
+     *   - market_cap_rank — место в рейтинге
+     *
+     * @param {Object} coin — один элемент массива из ответа /coins/markets
+     * @returns {string} — готовая HTML-разметка карточки
+     */
+    function createCoinCard(coin) {
+      const change = coin.price_change_percentage_24h;
+      const changeClass = change >= 0 ? 'positive' : 'negative';
+
+      return `
+        <article class="card">
+          <div class="card-top">
+            <img
+              class="coin-icon"
+              src="${coin.image}"
+              alt="${coin.name}"
+              width="40"
+              height="40"
+              loading="lazy"
+            />
+            <div>
+              <div class="coin-name">${coin.name}</div>
+              <div class="coin-symbol">${coin.symbol}</div>
+            </div>
+          </div>
+
+          <div class="coin-price">${formatCurrency(coin.current_price)}</div>
+          <div class="coin-change ${changeClass}">${formatPercent(change)} за 24ч</div>
+
+          <div class="coin-meta">
+            Капитализация: ${formatCurrency(coin.market_cap)}<br />
+            Рейтинг: #${coin.market_cap_rank}
+          </div>
+        </article>
+      `;
+    }
+
+    /* ============================================================
+       РЕНДЕР ВСЕХ КАРТОЧЕК
+       ============================================================ */
+
+    /**
+     * Очищает сетку и вставляет карточки для всех переданных монет.
+     *
+     * @param {Array<Object>} coins — массив объектов монет из API
+     */
+    function renderCoins(coins) {
+      grid.innerHTML = coins.map(createCoinCard).join('');
+    }
+
+    /* ============================================================
+       ЗАГРУЗКА ДАННЫХ
+       ============================================================ */
+
+    /**
+     * Главная асинхронная функция.
+     * 1. Включает состояние загрузки.
+     * 2. Делает fetch-запрос к CoinGecko.
+     * 3. Проверяет HTTP-статус (fetch не бросает ошибку на 4xx/5xx).
+     * 4. Парсит JSON и рендерит карточки.
+     * 5. В случае любой ошибки — показывает сообщение пользователю.
+     * 6. В блоке finally гарантированно выключает спиннер.
+     */
+    async function fetchTopCoins() {
+      setLoading(true);
+      showError(null); // Скрываем старую ошибку перед новым запросом
+
+      try {
+        const response = await fetch(API_URL);
+
+        // fetch не считает статусы 4xx и 5xx ошибками — проверяем вручную
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+
+        // Простая защита от неожиданного формата ответа
+        if (!Array.isArray(data) || data.length === 0) {
+          throw new Error('API вернул пустой или неверный ответ');
+        }
+
+        renderCoins(data);
+      } catch (error) {
+        console.error('Ошибка загрузки криптовалют:', error);
+
+        // Разделяем сетевые ошибки и ошибки API для более понятного сообщения
+        const message =
+          error instanceof TypeError
+            ? 'Не удалось подключиться к API. Проверьте интернет-соединение.'
+            : `Не удалось обновить данные: ${error.message}. Попробуйте позже.`;
+
+        showError(message);
+
+        // Если карточек ещё нет (первый запрос упал) — показываем заглушку,
+        // чтобы страница не выглядела пустой
+        if (grid.children.length === 0) {
+          renderSkeleton();
+        }
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    /* ============================================================
+       ИНИЦИАЛИЗАЦИЯ
+       ============================================================ */
+
+    /**
+     * Навешивает обработчик на кнопку и запускает первую загрузку.
+     *
+     * При клике:
+     * 1. Воспроизводится короткий звук (Web Audio API).
+     * 2. Вызывается fetchTopCoins(), который показывает спиннер
+     *    и обновляет карточки.
+     */
+    function init() {
+      refreshBtn.addEventListener('click', () => {
+        playClickSound();
+        fetchTopCoins();
+      });
+
+      // Скелетон показываем только при самом первом запуске
+      renderSkeleton();
+      fetchTopCoins();
+    }
+
+    init();
+  </script>
+</body>
+</html>
